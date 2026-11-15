@@ -9,6 +9,15 @@ MOOD_WEIGHT = 1.0
 ENERGY_WEIGHT = 1.0
 ACOUSTIC_WEIGHT = 0.5
 
+DEFAULT_WEIGHTS = {
+    "genre": GENRE_WEIGHT,
+    "mood": MOOD_WEIGHT,
+    "energy": ENERGY_WEIGHT,
+    "acoustic": ACOUSTIC_WEIGHT,
+}
+# Phase 4 experiment only: genre halved, energy doubled. Never used unless passed in.
+EXPERIMENT_WEIGHTS = {"genre": 1.0, "mood": 1.0, "energy": 2.0, "acoustic": 0.5}
+
 PROJECT_ROOT = Path(__file__).resolve().parent.parent
 NUMERIC_FIELDS = {
     "id": int,
@@ -103,13 +112,13 @@ def energy_similarity(song_energy: float, target_energy: float) -> float:
     return max(0.0, 1.0 - abs(song_energy - target_energy))
 
 
-def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
+def score_song(user_prefs: Dict, song: Dict, weights: Dict = DEFAULT_WEIGHTS) -> Tuple[float, List[str]]:
     """Score one song against the user's preferences and explain each point."""
     reasons = []
 
     # 1. Genre: +2.0 for an exact match.
     if song["genre"] == user_prefs["genre"]:
-        genre_points = GENRE_WEIGHT
+        genre_points = weights["genre"]
         reasons.append(f"genre match ({song['genre']}): +{genre_points:.1f}")
     else:
         genre_points = 0.0
@@ -117,14 +126,14 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
 
     # 2. Mood: +1.0 for an exact match.
     if song["mood"] == user_prefs["mood"]:
-        mood_points = MOOD_WEIGHT
+        mood_points = weights["mood"]
         reasons.append(f"mood match ({song['mood']}): +{mood_points:.1f}")
     else:
         mood_points = 0.0
         reasons.append(f"mood mismatch ({song['mood']} vs. {user_prefs['mood']}): +0.0")
 
     # 3. Energy: up to +1.0, rewarding closeness to the target (not just high energy).
-    energy_points = ENERGY_WEIGHT * energy_similarity(song["energy"], user_prefs["energy"])
+    energy_points = weights["energy"] * energy_similarity(song["energy"], user_prefs["energy"])
     reasons.append(
         f"energy similarity ({song['energy']:.2f} vs. target {user_prefs['energy']:.2f}): "
         f"+{energy_points:.3f}"
@@ -133,7 +142,7 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     # 4. Acoustic fit: up to +0.5, based on whether the user likes acoustic sounds.
     likes_acoustic = user_prefs.get("likes_acoustic", False)
     acoustic_fit = song["acousticness"] if likes_acoustic else 1.0 - song["acousticness"]
-    acoustic_points = ACOUSTIC_WEIGHT * acoustic_fit
+    acoustic_points = weights["acoustic"] * acoustic_fit
     preference = "prefers acoustic" if likes_acoustic else "prefers non-acoustic"
     reasons.append(
         f"acoustic fit (acousticness {song['acousticness']:.2f}, {preference}): "
@@ -145,11 +154,13 @@ def score_song(user_prefs: Dict, song: Dict) -> Tuple[float, List[str]]:
     return total, reasons
 
 
-def recommend_songs(user_prefs: Dict, songs: List[Dict], k: int = 5) -> List[Tuple[Dict, float, str]]:
+def recommend_songs(
+    user_prefs: Dict, songs: List[Dict], k: int = 5, weights: Dict = DEFAULT_WEIGHTS
+) -> List[Tuple[Dict, float, str]]:
     """Score every song, rank them best-first, and return the top k as (song, score, explanation)."""
     scored = []
     for song in songs:
-        score, reasons = score_song(user_prefs, song)
+        score, reasons = score_song(user_prefs, song, weights)
         energy_points = energy_similarity(song["energy"], user_prefs["energy"])
         scored.append((song, score, energy_points, "; ".join(reasons)))
 

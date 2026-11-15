@@ -11,7 +11,7 @@ Your goal is to:
 - Evaluate what your system gets right and wrong
 - Reflect on how this mirrors real world AI recommenders
 
-Replace this paragraph with your own summary of what your version does.
+**VibeMatch 1.0** is a small content-based music recommender that runs in the terminal. It loads an 18-song catalog (`data/songs.csv`) and compares every song with one listener's taste profile: favorite genre, favorite mood, target energy (0–1) and whether they like acoustic music. Each song gets a weighted score out of 4.5: genre match +2.0, mood match +1.0, energy closeness up to +1.0, and acoustic fit up to +0.5. The top 5 songs are printed with a reason for every point. The project also evaluates four different user profiles (including one with conflicting preferences) and runs a weight experiment to show how scoring choices create bias. Details are in the [Model Card](model_card.md).
 
 ---
 
@@ -215,38 +215,61 @@ Top 5 recommendations:
 
 ## Experiments You Tried
 
-Use this section to document the experiments you ran. For example:
+`python -m src.main` runs the default profile above, then four evaluation profiles and one weight experiment. Full output and analysis are in [model_card.md](model_card.md#7-evaluation).
 
-- What happened when you changed the weight on genre from 2.0 to 0.5
-- What happened when you added tempo or valence to the score
-- How did your system behave for different types of users
+**Top-5 results (original weights):**
+
+| Profile | #1 | #2 | #3 | #4 | #5 |
+|---|---|---|---|---|---|
+| High-Energy Pop (pop, happy, 0.9, non-acoustic) | Sunrise City 4.330 | Gym Hero 3.445 | Rooftop Lights 2.185 | Bassline Theory 1.475 | Storm Runner 1.440 |
+| Chill Lofi (lofi, relaxed, 0.2, acoustic) | Library Rain 3.280 | Focus Flow 3.190 | Midnight Coding 3.135 | Coffee Shop Stories 2.275 | Slow Burn Sunday 2.025 |
+| Deep Intense Rock (rock, angry, 0.95, non-acoustic) | Storm Runner 3.410 | Slow Burn Sunday 2.725 | Iron Horizon 2.460 | Gym Hero 1.455 | Bassline Theory 1.425 |
+| Conflicting: Peaceful Metal (metal, peaceful, 0.1, acoustic) | Quiet Sonata No. 3 2.405 | Iron Horizon 2.150 | Spacewalk Thoughts 1.280 | Library Rain 1.180 | Coffee Shop Stories 1.175 |
+
+**Key findings:**
+
+- **Energy and acoustic fit separate listening situations well.** The Pop and Lofi lists don't share a single song.
+- **Genre labels can override the actual sound.** For Deep Intense Rock, the calm rock song *Slow Burn Sunday* (energy 0.45) ranks #2, above the angry, high-energy metal song *Iron Horizon*.
+- **Mood-only matches cross genres in odd ways.** That same relaxed rock song reaches #5 for the Chill Lofi user.
+- **Conflicting preferences produce a mixed list.** The Peaceful Metal user gets a classical piece first and the aggressive metal song second.
+
+**Weight experiment (Deep Intense Rock): genre 2.0 → 1.0, energy 1.0 → 2.0**
+
+| Rank | Original | Experiment |
+|---|---|---|
+| 1 | Storm Runner (3.410) | Iron Horizon (3.440) |
+| 2 | Slow Burn Sunday (2.725) | Storm Runner (3.370) |
+| 3 | Iron Horizon (2.460) | Gym Hero (2.435) |
+| 4 | Gym Hero (1.455) | Bassline Theory (2.365) |
+| 5 | Bassline Theory (1.425) | Slow Burn Sunday (2.225) |
+
+For this profile the experiment is an improvement: the calm rock song drops from #2 to #5. But it makes genre matter much less everywhere. For the Peaceful Metal user, the only metal song falls out of the top 5. The original weights remain the default, and the experiment weights are only used when passed in explicitly.
 
 ---
 
 ## Limitations and Risks
 
-Summarize some limitations of your recommender.
+- **Exact genre matching:** `"indie pop"` gets no credit from a `"pop"` user.
+- **Genre dominates:** +2.0 for genre beats the best possible energy and acoustic bonus (+1.5), so a song's label can matter more than how it sounds.
+- **Tiny, uneven catalog:** 18 songs. 11 of the 14 genres have only one song, so metal or classical fans get far fewer good matches than lofi fans.
+- **Subjective, single mood labels:** "chill", "relaxed" and "peaceful" count as completely different.
+- **No learning:** the system ignores skips, replays and other users. The same profile always gets the same list, which risks a filter bubble.
 
-Examples:
-
-- It only works on a tiny catalog
-- It does not understand lyrics or language
-- It might over favor one genre or mood
-
-You will go deeper on this in your model card.
+See [model_card.md](model_card.md#6-observed-behavior-limitations-and-bias) for details.
 
 ---
 
 ## Reflection
 
-Read and complete `model_card.md`:
+The full evaluation, limitations and personal reflection are in the [**Model Card**](model_card.md).
 
-[**Model Card**](model_card.md)
+**How recommenders turn data into predictions.** VibeMatch never "hears" a song. It only compares labels (genre, mood) and numbers (energy, acousticness) with what the user said they want, then adds up weighted points. A "prediction" is just the highest total. The weights are the real decision-makers: in the Phase 4 experiment, halving the genre weight and doubling the energy weight moved *Iron Horizon* from #3 to #1 for the same user and the same songs. Real platforms like Spotify and YouTube work at a much larger scale and also learn from behavior (skips, replays, other listeners), but they still depend on choices about which signals count and by how much.
 
-Write 1 to 2 paragraphs here about what you learned:
+**Where bias and unfairness show up.** Bias came from the data and the rules, not from any intent:
+- Exact genre matching gave *Rooftop Lights* ("indie pop") no credit from a pop fan.
+- The heavy genre weight put a calm rock song at #2 for a user who wanted intense, angry music.
+- The uneven catalog means a metal fan can only ever get one metal song, while a lofi fan gets three.
 
-- about how recommenders turn data into predictions
-- about where bias or unfairness could show up in systems like this
+Because the same profile always produces the same genre-heavy list, a system like this can trap users in a filter bubble without anyone noticing.
 
-
-
+> **[TO COMPLETE — your own words]:** Add a sentence or two on what you personally took away from this project.

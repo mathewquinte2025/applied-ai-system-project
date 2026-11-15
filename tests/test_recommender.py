@@ -1,6 +1,15 @@
 import pytest
 
-from src.recommender import Song, UserProfile, Recommender, load_songs, recommend_songs, score_song
+from src.recommender import (
+    DEFAULT_WEIGHTS,
+    EXPERIMENT_WEIGHTS,
+    Recommender,
+    Song,
+    UserProfile,
+    load_songs,
+    recommend_songs,
+    score_song,
+)
 
 def make_small_recommender() -> Recommender:
     songs = [
@@ -164,3 +173,22 @@ def test_recommend_songs_does_not_reorder_input():
     original_ids = [song["id"] for song in songs]
     recommend_songs(POP_USER, songs, k=5)
     assert [song["id"] for song in songs] == original_ids
+
+
+# --- Phase 4: weight experiment must not change the default scoring ---
+
+
+def test_default_weights_are_unchanged():
+    assert DEFAULT_WEIGHTS == {"genre": 2.0, "mood": 1.0, "energy": 1.0, "acoustic": 0.5}
+    score, _ = score_song(POP_USER, make_song(1, acousticness=0.0))
+    assert score == pytest.approx(4.5)
+
+
+def test_experiment_weights_halve_genre_and_double_energy():
+    assert EXPERIMENT_WEIGHTS == {"genre": 1.0, "mood": 1.0, "energy": 2.0, "acoustic": 0.5}
+    song = make_song(1, genre="pop", mood="sad", energy=0.6, acousticness=1.0)
+    default_score, _ = score_song(POP_USER, song)                     # 2.0 + 0 + 0.8 + 0
+    experiment_score, _ = score_song(POP_USER, song, EXPERIMENT_WEIGHTS)  # 1.0 + 0 + 1.6 + 0
+    assert default_score == pytest.approx(2.8)
+    assert experiment_score == pytest.approx(2.6)
+    assert score_song(POP_USER, song)[0] == default_score  # default still used afterwards

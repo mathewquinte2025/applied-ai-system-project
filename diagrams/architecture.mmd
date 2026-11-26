@@ -1,0 +1,38 @@
+flowchart TD
+    %% VibeMatch 2.0: rule-based music recommender with a reliability and guardrail layer
+
+    User([User]) -->|"--genre --mood --energy --acoustic --k<br/>(or no options = original demo)"| CLI["CLI<br/>src/main.py (argparse)"]
+    CSV[("Song catalog<br/>data/songs.csv")] --> Loader
+
+    CLI --> Loader["Safe CSV loader<br/>load_songs() in src/recommender.py<br/>missing file → clear error<br/>bad rows → skipped + logged"]
+    Loader --> InGuard
+
+    subgraph Guardrails["Reliability and guardrail layer: safe_recommend() in src/guardrails.py"]
+        InGuard["1 · Input guardrails<br/>clean labels, check energy 0–1,<br/>yes/no acoustic, valid k"]
+        Warn["2 · Warnings<br/>unknown genre/mood + 'did you mean',<br/>genre+mood gap, conflicting preferences"]
+        Scorer["3 · Original rule-based scorer (unchanged)<br/>recommend_songs() + score_song()<br/>genre 2.0 · mood 1.0 · energy 1.0 · acoustic 0.5"]
+        OutGuard["4 · Output checks<br/>count, score range 0–4.5, sorted,<br/>no duplicates, explanations present"]
+        Conf["5 · Confidence label<br/>High ≥ 3.5 · Medium ≥ 2.5 · Low"]
+        InGuard --> Warn --> Scorer --> OutGuard --> Conf
+    end
+
+    InGuard -.->|invalid input| Error["Friendly 'Input error' message<br/>exit code 1, no crash"]
+    Loader -.->|missing / broken file| Error
+    Conf --> Output["Terminal output<br/>top-k songs + reasons + confidence + warnings"]
+    Output --> User
+
+    Loader -.-> Log[("logs/recommender.log")]
+    Guardrails -.-> Log
+
+    subgraph Testing["Testing and evaluation"]
+        Pytest["pytest<br/>tests/test_recommender.py (14)<br/>tests/test_guardrails.py (29)"]
+        Eval["Reliability evaluation<br/>src/evaluate.py: 18 cases<br/>normal · edge · invalid · data · output"]
+        Results[("assets/evaluation_results.txt<br/>pass rate")]
+        Eval --> Results
+    end
+
+    Pytest -.->|checks| Guardrails
+    Eval -.->|runs same pipeline| Loader
+    Human{{"Human review<br/>read outputs, warnings and pass rate;<br/>compare rankings with intuition"}}
+    Results --> Human
+    Output --> Human

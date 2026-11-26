@@ -1,0 +1,25 @@
+Music Recommender - Reliability Evaluation
+Run at: 2026-11-25 19:58:52  |  Catalog: data/songs.csv (18 songs)
+
+#  Result Type     Case                                              Details
+------------------------------------------------------------------------------------------------------------------------
+1  PASS   Normal   Default pop profile ranks Sunrise City #1         #1 Sunrise City, confidence High, 0 warnings
+2  PASS   Normal   Deep Intense Rock ranks Storm Runner #1           #1 Storm Runner, confidence Medium
+3  PASS   Normal   Chill Lofi: top 3 lofi + genre/mood gap warning   top 3 all lofi: True, genre/mood gap warned: True
+4  PASS   Normal   Guardrails do not change original scoring         5 profiles: guarded results identical to original recommend_songs()
+5  PASS   Normal   Same input gives same output (reproducible)       3 runs gave the same ranking
+6  PASS   Edge     Messy input ('  Hip Hop ', 'CONFIDENT') cleaned   cleaned to genre='hip hop', #1 Concrete Verses
+7  PASS   Edge     Unknown genre 'hiphop' warns + suggests           suggestion given: True, still 5 results
+8  PASS   Edge     Conflicting prefs (Peaceful Metal) flagged        2 conflict warnings, confidence Low
+9  PASS   Edge     k larger than catalog is capped                   k=50 capped to 18 with warning
+10 PASS   Invalid  Energy 1.5 is rejected                            rejected: Energy must be between 0.0 and 1.0 (got 1.5).
+11 PASS   Invalid  Energy 'loud' is rejected                         rejected: Energy must be a number between 0.0 and 1.0 (got 'loud').
+12 PASS   Invalid  Acoustic 'maybe' is rejected                      rejected: Acoustic preference must be yes or no (got 'maybe').
+13 PASS   Invalid  k = 0 is rejected                                 rejected: Number of recommendations must be at least 1 (got 0).
+14 PASS   Invalid  Missing 'mood' field is rejected                  rejected: The user profile is missing: mood.
+15 PASS   Invalid  Blank genre is rejected                           rejected: 'genre' must be a non-empty word, for example 'pop'.
+16 PASS   Data     Missing CSV file gives a clear error              rejected: Song file not found: 'data/does_not_exist.csv'. Check the path and try again.
+17 PASS   Data     Malformed CSV rows are skipped, not fatal         loaded 1 of 4 rows (3 bad rows skipped)
+18 PASS   Output   Output check catches bad results                  detected 4 problems (range, order, duplicate, missing explanation)
+------------------------------------------------------------------------------------------------------------------------
+Pass rate: 18/18 cases passed (100%)

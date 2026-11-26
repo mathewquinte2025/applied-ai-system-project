@@ -1,4 +1,5 @@
 import csv
+import logging
 from dataclasses import asdict, dataclass
 from pathlib import Path
 from typing import Dict, List, Tuple
@@ -27,6 +28,10 @@ NUMERIC_FIELDS = {
     "danceability": float,
     "acousticness": float,
 }
+TEXT_FIELDS = ("title", "artist", "genre", "mood")
+REQUIRED_COLUMNS = set(NUMERIC_FIELDS) | set(TEXT_FIELDS)
+
+logger = logging.getLogger(__name__)
 
 
 @dataclass
@@ -90,20 +95,51 @@ class Recommender:
         return f"Score {score:.3f}/4.5: " + "; ".join(reasons)
 
 
+def clean_song_row(row: Dict) -> Dict:
+    """Convert one CSV row into a song dictionary, or raise ValueError if it is unusable."""
+    for field in TEXT_FIELDS:
+        if not (row.get(field) or "").strip():
+            raise ValueError(f"missing {field}")
+    for field, convert in NUMERIC_FIELDS.items():
+        row[field] = convert(row[field])
+    for field in ("energy", "acousticness"):
+        if not 0.0 <= row[field] <= 1.0:
+            raise ValueError(f"{field} {row[field]} is outside 0.0-1.0")
+    # Labels are compared exactly, so store them trimmed and lowercase.
+    row["genre"] = " ".join(row["genre"].split()).lower()
+    row["mood"] = " ".join(row["mood"].split()).lower()
+    return row
+
+
 def load_songs(csv_path: str) -> List[Dict]:
-    """Load songs from a CSV file into dictionaries with numeric fields converted."""
+    """Load songs from a CSV file into dictionaries with numeric fields converted.
+
+    Raises FileNotFoundError with a clear message if the file is missing, and
+    ValueError if required columns are missing. Bad rows are skipped and logged.
+    """
     path = Path(csv_path)
     if not path.exists():
         # Fall back to the project root so the program also works from other folders.
         path = PROJECT_ROOT / csv_path
+    if not path.exists():
+        logger.error("Song file not found: %s", csv_path)
+        raise FileNotFoundError(f"Song file not found: '{csv_path}'. Check the path and try again.")
 
     songs = []
     with open(path, newline="", encoding="utf-8") as csv_file:
-        for row in csv.DictReader(csv_file):
-            for field, convert in NUMERIC_FIELDS.items():
-                row[field] = convert(row[field])
-            songs.append(row)
-    print(f"Loaded {len(songs)} songs from {csv_path}")
+        reader = csv.DictReader(csv_file)
+        missing_columns = REQUIRED_COLUMNS - set(reader.fieldnames or [])
+        if missing_columns:
+            logger.error("Song file %s is missing columns: %s", csv_path, sorted(missing_columns))
+            raise ValueError(f"Song file '{csv_path}' is missing columns: {', '.join(sorted(missing_columns))}.")
+
+        for line_number, row in enumerate(reader, start=2):  # line 1 is the header
+            try:
+                songs.append(clean_song_row(row))
+            except (KeyError, TypeError, ValueError) as error:
+                logger.warning("Skipping line %d of %s: %s", line_number, csv_path, error)
+
+    logger.info("Loaded %d songs from %s", len(songs), csv_path)
     return songs
 
 
